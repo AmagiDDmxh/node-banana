@@ -17,7 +17,7 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 600; // a large video over a slow local connection
+export const maxDuration = 300; // Vercel Hobby maximum
 
 export async function PUT(request: Request, { params }: { params: Promise<{ uploadId: string }> }) {
   return handle(request, "assets.upload", async () => {

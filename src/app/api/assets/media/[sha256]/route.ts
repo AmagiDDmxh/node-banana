@@ -25,7 +25,7 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 600; // snapshot media can be a large video
+export const maxDuration = 300; // Vercel Hobby maximum
 
 interface RouteContext {
   params: Promise<{ sha256: string }>;

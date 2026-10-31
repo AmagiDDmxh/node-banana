@@ -32,13 +32,13 @@ export async function saveSession(session: LogSession): Promise<void> {
     return;
   }
 
-  const logsDir = process.env.NODE_BANANA_LOGS_DIR || path.join(process.cwd(), 'logs');
+  const logsDir = process.env.NODE_BANANA_LOGS_DIR || path.join(/* turbopackIgnore: true */ process.cwd(), 'logs');
   const filename = `session-${session.sessionId}.json`;
-  const filepath = path.join(logsDir, filename);
+  const filepath = path.join(/* turbopackIgnore: true */ logsDir, filename);
 
   // Ensure logs directory exists
   try {
-    await fs.mkdir(logsDir, { recursive: true });
+    await fs.mkdir(/* turbopackIgnore: true */ logsDir, { recursive: true });
   } catch (error) {
     console.error('Failed to create logs directory:', error);
     return;
@@ -66,11 +66,11 @@ export async function rotateLogFiles(): Promise<void> {
     return;
   }
 
-  const logsDir = process.env.NODE_BANANA_LOGS_DIR || path.join(process.cwd(), 'logs');
+  const logsDir = process.env.NODE_BANANA_LOGS_DIR || path.join(/* turbopackIgnore: true */ process.cwd(), 'logs');
 
   // Ensure logs directory exists
   try {
-    await fs.mkdir(logsDir, { recursive: true });
+    await fs.mkdir(/* turbopackIgnore: true */ logsDir, { recursive: true });
   } catch (error) {
     console.error('Failed to create logs directory:', error);
     return;
@@ -79,7 +79,7 @@ export async function rotateLogFiles(): Promise<void> {
   // Get all log files
   let files: string[];
   try {
-    files = await fs.readdir(logsDir);
+    files = await fs.readdir(/* turbopackIgnore: true */ logsDir);
   } catch (error) {
     console.error('Failed to read logs directory:', error);
     return;
@@ -95,7 +95,7 @@ export async function rotateLogFiles(): Promise<void> {
   const filesToDelete = sessionFiles.slice(10);
   for (const file of filesToDelete) {
     try {
-      await fs.unlink(path.join(logsDir, file));
+      await fs.unlink(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ logsDir, file));
       console.log(`Deleted old log file: ${file}`);
     } catch (error) {
       console.error(`Failed to delete log file ${file}:`, error);

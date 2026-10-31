@@ -6,7 +6,10 @@ import type { ImageGenerationMetadata } from "@/types/api";
 import { decodeBase64, parseDataUrl } from "@/utils/dataUrl";
 import { mimeOfExtension, sniffExtension } from "@/utils/mediaSniff";
 
-const OPENAI_API_BASE = "https://api.openai.com/v1/images";
+function imageApiBase(): string {
+  const base = process.env.NARRA_GATEWAY_BASE_URL?.trim() || "https://api.openai.com/v1";
+  return `${base.replace(/\/$/, "")}/images`;
+}
 const OPENAI_IMAGE_TIMEOUT_MS = 240_000;
 const MAX_REFERENCE_IMAGES = 16;
 const MAX_REFERENCE_BYTES = 50 * 1024 * 1024;
@@ -128,7 +131,7 @@ export async function generateWithOpenAI(requestId: string, apiKey: string, inpu
   try {
     signal.throwIfAborted();
     console.log(`[API:${requestId}] OpenAI model=${input.model.id}, references=${images.length}`);
-    const response = await fetchWithRetry(`${OPENAI_API_BASE}/${images.length ? "edits" : "generations"}`, { method: "POST", headers, body, signal }, { label: "OpenAI images" });
+    const response = await fetchWithRetry(`${imageApiBase()}/${images.length ? "edits" : "generations"}`, { method: "POST", headers, body, signal }, { label: "OpenAI images" });
     if (!response.ok) return await upstreamError(response, input.model.name);
     const data: OpenAIImageResponse = await response.json();
     const base64 = data.data?.[0]?.b64_json;

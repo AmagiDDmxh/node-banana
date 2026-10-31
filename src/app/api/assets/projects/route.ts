@@ -13,5 +13,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
+  if (process.env.VERCEL) {
+    return json({ root: "", projects: [], elsewhere: null, offerDismissed: true, rootBytes: 0 });
+  }
   return handle(request, "assets.projects", async () => json(await listProjects()));
 }

@@ -106,9 +106,9 @@ describe("every /api/assets route", () => {
   });
 
   it("gives uploads and url ingest ten minutes, job starts one", () => {
-    expect(root.maxDuration).toBe(600);
-    expect(upload.maxDuration).toBe(600);
-    expect(media.maxDuration).toBe(600);
+    expect(root.maxDuration).toBe(300);
+    expect(upload.maxDuration).toBe(300);
+    expect(media.maxDuration).toBe(300);
     expect(importProjects.maxDuration).toBe(60);
     expect(scanProjects.maxDuration).toBe(60);
     expect(cleanup.maxDuration).toBe(60);

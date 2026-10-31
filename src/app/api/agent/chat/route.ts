@@ -29,7 +29,8 @@ import { logger } from "@/utils/logger";
 import { AGENT_CHAT_MAX_BODY_BYTES, AGENT_HARNESS_LABELS, formatByteLimit, readJsonBody } from "../shared";
 
 export const runtime = "nodejs";
-export const maxDuration = 600; // 10 minutes: a long agent turn with many tool calls
+// Vercel Hobby allows at most 300 seconds per Serverless Function.
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 function plainText(message: string, status: number): Response {

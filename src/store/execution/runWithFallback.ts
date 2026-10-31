@@ -27,6 +27,10 @@ export interface RunWithFallbackOptions {
   clearOutput?: Partial<WorkflowNodeData>;
 }
 
+export class SubmissionUnknownError extends Error {
+  constructor(message: string) { super(message); this.name = "SubmissionUnknownError"; }
+}
+
 function isAbortError(err: unknown): boolean {
   return err instanceof DOMException && err.name === "AbortError";
 }

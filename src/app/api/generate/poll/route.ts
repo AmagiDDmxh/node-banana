@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return buildMediaResponse(output);
+      return await buildMediaResponse(output);
     }
 
     if (provider !== 'kie') {
@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return buildMediaResponse(output);
+    return await buildMediaResponse(output);
   } catch (error) {
     console.error(`[API:${requestId}] Poll error:`, error);
     return NextResponse.json<GenerateResponse>(

@@ -95,8 +95,13 @@ export async function POST(request: NextRequest) {
       console.log(`[Quickstart:${requestId}] Using preset template: ${templateId}`);
       try {
         const workflow = getPresetTemplate(templateId, contentLevel);
-        // Convert any local image paths to base64 for the Gemini API
-        const workflowWithBase64 = await convertLocalImagesToBase64(workflow);
+        // Vercel has no durable local filesystem and large base64 responses can
+        // exceed the Serverless response limit. Public sample assets are valid
+        // browser URLs in the hosted demo; the desktop server still inlines
+        // them for provider requests that require bytes.
+        const workflowWithBase64 = process.env.VERCEL
+          ? workflow
+          : await convertLocalImagesToBase64(workflow);
         console.log(`[Quickstart:${requestId}] Preset template loaded successfully`);
         return NextResponse.json<QuickstartResponse>({
           success: true,

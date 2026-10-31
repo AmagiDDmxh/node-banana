@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     // Validate directory exists
     try {
-      const stats = await fs.stat(directoryPath);
+      const stats = await fs.stat(/* turbopackIgnore: true */ directoryPath);
       if (!stats.isDirectory()) {
         logger.warn('file.error', 'Generation load failed: path is not a directory', {
           directoryPath,
@@ -87,9 +87,9 @@ export async function POST(request: NextRequest) {
     let filePath: string | null = null;
 
     for (const ext of SUPPORTED_EXTENSIONS) {
-      const candidatePath = path.join(directoryPath, `${imageId}.${ext}`);
+      const candidatePath = path.join(/* turbopackIgnore: true */ directoryPath, `${imageId}.${ext}`);
       try {
-        await fs.access(candidatePath);
+        await fs.access(/* turbopackIgnore: true */ candidatePath);
         foundExtension = ext;
         filePath = candidatePath;
         break;
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Read the file
-    const buffer = await fs.readFile(filePath);
+    const buffer = await fs.readFile(/* turbopackIgnore: true */ filePath);
 
     // Convert to base64 data URL
     const mimeType = EXT_TO_MIME[foundExtension] || 'application/octet-stream';

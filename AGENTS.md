@@ -19,6 +19,11 @@ Create `.env.local` in the root directory:
 ```bash
 GEMINI_API_KEY=your_gemini_api_key
 OPENAI_API_KEY=your_openai_api_key  # Optional, for OpenAI LLM provider
+NARRA_GATEWAY_BASE_URL=https://narra.up.railway.app/v1 # Optional OpenAI-compatible Narra Gateway
+NARRA_GATEWAY_API_KEY=your_gateway_key # Server-only; do not put this in browser settings
+HYPERPLANE_URL=http://127.0.0.1:13000 # Optional: route image operations through Hyperplane instead
+NODE_BANANA_ACCESS_PASSWORD=your_shared_password # Required for public deployments
+NODE_BANANA_AUTH_SECRET=random_long_server_secret # Required for public deployments
 KIE_API_KEY=your_kie_api_key        # Optional, for Kie.ai models (Sora, Veo, Kling, etc.)
 COMFY_API_KEY=your_comfy_api_key    # Optional, for ComfyUI-hosted models via Comfy Router (Flux, GPT Image, Nano Banana, Kling, Veo, etc.)
 ```

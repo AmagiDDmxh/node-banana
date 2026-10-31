@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
 
     // Validate workflow directory exists, or create it if missing
     try {
-      const stats = await fs.stat(workflowPath);
+      const stats = await fs.stat(/* turbopackIgnore: true */ workflowPath);
       if (!stats.isDirectory()) {
         logger.warn('file.error', 'Workflow image save failed: path is not a directory', {
           workflowPath,
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        await fs.mkdir(workflowPath, { recursive: true });
+        await fs.mkdir(/* turbopackIgnore: true */ workflowPath, { recursive: true });
         logger.info('file.save', 'Created workflow directory for image save', {
           workflowPath,
         });
@@ -162,9 +162,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Create target folder if it doesn't exist
-    const targetFolder = path.join(workflowPath, folder);
+    const targetFolder = path.join(/* turbopackIgnore: true */ workflowPath, folder);
     try {
-      await fs.mkdir(targetFolder, { recursive: true });
+      await fs.mkdir(/* turbopackIgnore: true */ targetFolder, { recursive: true });
     } catch (mkdirError) {
       logger.error('file.error', 'Failed to create target folder', {
         targetFolder,
@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
     // The bytes pick the extension when they prove a format; the declared type is only a label.
     const extension = imageExtension(decoded.bytes, decoded.mime);
     const filename = `${safeImageId}.${extension}`;
-    const filePath = path.join(targetFolder, filename);
+    const filePath = path.join(/* turbopackIgnore: true */ targetFolder, filename);
     const buffer = Buffer.from(decoded.bytes.buffer, decoded.bytes.byteOffset, decoded.bytes.byteLength);
 
     // Write the image file
@@ -225,7 +225,7 @@ async function listMediaIds(workflowPath: string): Promise<string[]> {
   for (const sub of [IMAGES_FOLDER, "generations", LEGACY_IMAGES_FOLDER]) {
     let names: string[] = [];
     try {
-      names = await fs.readdir(path.join(workflowPath, sub));
+      names = await fs.readdir(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ workflowPath, sub));
     } catch {
       continue;
     }
@@ -296,7 +296,7 @@ export async function GET(request: NextRequest) {
 
     // Validate workflow directory exists
     try {
-      const stats = await fs.stat(workflowPath);
+      const stats = await fs.stat(/* turbopackIgnore: true */ workflowPath);
       if (!stats.isDirectory()) {
         return NextResponse.json(
           { success: false, error: "Workflow path is not a directory" },
@@ -312,9 +312,9 @@ export async function GET(request: NextRequest) {
 
     // Construct file path - check folders and extensions in order
     const possibleExtensions = Object.keys(IMAGE_EXTENSIONS);
-    const inputsFolder = path.join(workflowPath, IMAGES_FOLDER);
-    const generationsFolder = path.join(workflowPath, "generations");
-    const legacyFolder = path.join(workflowPath, LEGACY_IMAGES_FOLDER);
+    const inputsFolder = path.join(/* turbopackIgnore: true */ workflowPath, IMAGES_FOLDER);
+    const generationsFolder = path.join(/* turbopackIgnore: true */ workflowPath, "generations");
+    const legacyFolder = path.join(/* turbopackIgnore: true */ workflowPath, LEGACY_IMAGES_FOLDER);
 
     // Build search order based on folder hint
     const searchOrder = folder === "generations"
@@ -328,9 +328,9 @@ export async function GET(request: NextRequest) {
     for (const searchFolder of searchOrder) {
       for (const ext of possibleExtensions) {
         const filename = `${safeImageId}.${ext}`;
-        const candidatePath = path.join(searchFolder, filename);
+        const candidatePath = path.join(/* turbopackIgnore: true */ searchFolder, filename);
         try {
-          await fs.access(candidatePath);
+          await fs.access(/* turbopackIgnore: true */ candidatePath);
           filePath = candidatePath;
           foundExtension = ext;
           if (searchFolder === legacyFolder) {
@@ -359,7 +359,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Read the image file
-    const buffer = await fs.readFile(filePath);
+    const buffer = await fs.readFile(/* turbopackIgnore: true */ filePath);
 
     // Convert to base64 data URL with correct MIME type
     const base64 = buffer.toString("base64");

@@ -91,11 +91,11 @@ export interface ReferencedHashes {
 }
 
 function runFile(layout: LibraryLayout, runId: string): string {
-  return path.join(layout.runs, `${requireRunId(runId)}.json.gz`);
+  return path.join(/* turbopackIgnore: true */ layout.runs, `${requireRunId(runId)}.json.gz`);
 }
 
 function hashListFile(layout: LibraryLayout, runId: string): string {
-  return path.join(layout.runs, `${requireRunId(runId)}.hashes.json`);
+  return path.join(/* turbopackIgnore: true */ layout.runs, `${requireRunId(runId)}.hashes.json`);
 }
 
 function isAbsent(error: unknown): boolean {
@@ -180,7 +180,7 @@ export class RunStore {
   private async load(runId: string): Promise<{ run: StoredRun | null; unreadable: boolean }> {
     let raw: Buffer;
     try {
-      raw = await withFsRetry(() => fs.readFile(runFile(this.layout, runId)));
+      raw = await withFsRetry(() => fs.readFile(/* turbopackIgnore: true */ runFile(this.layout, runId)));
     } catch (error) {
       return { run: null, unreadable: !isAbsent(error) };
     }
@@ -194,7 +194,7 @@ export class RunStore {
   /** The hash list next to a snapshot, when it was written for exactly this version of it. */
   private async readHashList(runId: string, stamp: string): Promise<string[] | null> {
     try {
-      const parsed = JSON.parse(await fs.readFile(hashListFile(this.layout, runId), "utf8")) as { stamp?: unknown; hashes?: unknown };
+      const parsed = JSON.parse(await fs.readFile(/* turbopackIgnore: true */ hashListFile(this.layout, runId), "utf8")) as { stamp?: unknown; hashes?: unknown };
       if (parsed.stamp !== stamp || !Array.isArray(parsed.hashes)) return null;
       return parsed.hashes.filter(isSha256);
     } catch {
@@ -245,11 +245,11 @@ export class RunStore {
         mediaHashes: [...new Set([...(existing?.mediaHashes ?? []), ...hashes])],
       };
       stored[request.phase] = workflow;
-      await fs.mkdir(this.layout.runs, { recursive: true });
+      await fs.mkdir(/* turbopackIgnore: true */ this.layout.runs, { recursive: true });
       const file = runFile(this.layout, runId);
       await atomicWriteFile(file, await gzip(Buffer.from(JSON.stringify(stored))), { fsync: false });
       try {
-        const stamp = stampOf(await fs.stat(file));
+        const stamp = stampOf(await fs.stat(/* turbopackIgnore: true */ file));
         this.hashCache.set(path.basename(file), { stamp, hashes: stored.mediaHashes });
         await this.writeHashList(runId, stamp, stored.mediaHashes);
       } catch {
@@ -276,7 +276,7 @@ export class RunStore {
       const runId = name.slice(0, -".json.gz".length);
       let stamp: string;
       try {
-        stamp = stampOf(await fs.stat(path.join(this.layout.runs, name)));
+        stamp = stampOf(await fs.stat(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ this.layout.runs, name)));
       } catch (error) {
         if (!isAbsent(error)) incomplete = true;
         return;
@@ -304,7 +304,7 @@ export class RunStore {
 
   private async listRunFiles(): Promise<{ name: string; runId: string }[]> {
     try {
-      return (await fs.readdir(this.layout.runs)).flatMap((name) => {
+      return (await fs.readdir(/* turbopackIgnore: true */ this.layout.runs)).flatMap((name) => {
         const match = RUN_FILE.exec(name);
         return match ? [{ name, runId: match[1] }] : [];
       });
@@ -321,7 +321,7 @@ export class RunStore {
       this.hashCache.delete(path.basename(file));
       let existed = true;
       try {
-        await fs.stat(file);
+        await fs.stat(/* turbopackIgnore: true */ file);
       } catch (error) {
         if (isAbsent(error)) existed = false;
       }
@@ -342,7 +342,7 @@ export class RunStore {
     for (const { runId } of await this.listRunFiles()) {
       if (keep.has(runId)) continue;
       try {
-        const stat = await fs.stat(runFile(this.layout, runId));
+        const stat = await fs.stat(/* turbopackIgnore: true */ runFile(this.layout, runId));
         if (stat.mtimeMs >= olderThan) continue;
         if (await this.remove(runId)) {
           files++;
@@ -354,14 +354,14 @@ export class RunStore {
     }
     let names: string[] = [];
     try {
-      names = await fs.readdir(this.layout.runs);
+      names = await fs.readdir(/* turbopackIgnore: true */ this.layout.runs);
     } catch {
       names = [];
     }
     const snapshots = new Set(names.filter((name) => RUN_FILE.test(name)));
     for (const name of names) {
       const match = HASH_LIST_FILE.exec(name);
-      if (match && !snapshots.has(`${match[1]}.json.gz`)) await unlinkWithRetry(path.join(this.layout.runs, name)).catch(() => {});
+      if (match && !snapshots.has(`${match[1]}.json.gz`)) await unlinkWithRetry(path.join(/* turbopackIgnore: true */ this.layout.runs, name)).catch(() => {});
     }
     return { files, bytes };
   }
@@ -371,7 +371,7 @@ export class RunStore {
   private async listMedia(): Promise<Map<string, string>> {
     const index = new Map<string, string>();
     try {
-      for (const name of await fs.readdir(this.layout.media)) {
+      for (const name of await fs.readdir(/* turbopackIgnore: true */ this.layout.media)) {
         if (name.endsWith(PARTIAL_SUFFIX) || name.endsWith(".tmp") || name.endsWith(REF_SUFFIX)) continue;
         const sha = name.split(".")[0];
         if (isSha256(sha)) index.set(sha, name);
@@ -391,9 +391,9 @@ export class RunStore {
     }
     const name = this.mediaIndex.get(sha256);
     if (!name) return null;
-    const file = path.join(this.layout.media, name);
+    const file = path.join(/* turbopackIgnore: true */ this.layout.media, name);
     try {
-      await fs.access(file);
+      await fs.access(/* turbopackIgnore: true */ file);
       return file;
     } catch {
       this.mediaIndex.delete(sha256);
@@ -402,7 +402,7 @@ export class RunStore {
   }
 
   private refFile(sha256: string): string {
-    return path.join(this.layout.media, `${requireSha256(sha256)}${REF_SUFFIX}`);
+    return path.join(/* turbopackIgnore: true */ this.layout.media, `${requireSha256(sha256)}${REF_SUFFIX}`);
   }
 
   /**
@@ -415,7 +415,7 @@ export class RunStore {
     if (!isSha256(sha256)) return null;
     let ref: { path?: unknown; bytes?: unknown };
     try {
-      ref = JSON.parse(await fs.readFile(this.refFile(sha256), "utf8")) as { path?: unknown; bytes?: unknown };
+      ref = JSON.parse(await fs.readFile(/* turbopackIgnore: true */ this.refFile(sha256), "utf8")) as { path?: unknown; bytes?: unknown };
     } catch {
       return null;
     }
@@ -424,7 +424,7 @@ export class RunStore {
       return null;
     }
     try {
-      const stat = await fs.stat(file);
+      const stat = await fs.stat(/* turbopackIgnore: true */ file);
       if (!stat.isFile() || stat.size !== ref.bytes) return null;
       const version = `${file}\0${stat.size}\0${stat.mtimeMs}`;
       if (this.verifiedRefs.get(sha256) !== version) {
@@ -466,14 +466,14 @@ export class RunStore {
     const existing = (await this.mediaFile(sha256)) ?? (await this.referencedFile(sha256))?.path;
     if (existing) {
       if ("cancel" in body && typeof body.cancel === "function") await body.cancel().catch(() => {});
-      return { sha256, bytes: (await fs.stat(existing)).size };
+      return { sha256, bytes: (await fs.stat(/* turbopackIgnore: true */ existing)).size };
     }
     const written = await streamToPartial(body, this.layout.media, { maxBytes: MAX_MEDIA_BYTES, idleTimeoutMs: 60_000 });
     if (written.sha256 !== sha256) {
       await discardPartial(written);
       throw new LibraryError("The uploaded bytes do not match their hash", 400, "hash_mismatch");
     }
-    const file = path.join(this.layout.media, `${sha256}.${type.ext}`);
+    const file = path.join(/* turbopackIgnore: true */ this.layout.media, `${sha256}.${type.ext}`);
     try {
       await commitPartial(written.partialPath, file);
     } catch (error) {
@@ -491,7 +491,7 @@ export class RunStore {
     const file = await this.mediaFile(sha256);
     if (file) {
       try {
-        const stat = await fs.stat(file);
+        const stat = await fs.stat(/* turbopackIgnore: true */ file);
         const ext = extOf(file);
         const mime = ext === "bin" ? "application/octet-stream" : (mediaTypeForExt(ext)?.mime ?? "application/octet-stream");
         return { path: file, mime, bytes: stat.size, filename: path.basename(file) };
@@ -511,8 +511,8 @@ export class RunStore {
    */
   async adoptFile(sha256: string, ext: string, file: string): Promise<boolean> {
     if (await this.mediaFile(sha256)) return false;
-    await fs.mkdir(this.layout.media, { recursive: true });
-    const target = path.join(this.layout.media, `${sha256}.${ext}`);
+    await fs.mkdir(/* turbopackIgnore: true */ this.layout.media, { recursive: true });
+    const target = path.join(/* turbopackIgnore: true */ this.layout.media, `${sha256}.${ext}`);
     try {
       await renameWithRetry(file, target);
     } catch (error) {
@@ -537,7 +537,7 @@ export class RunStore {
    */
   async retainReference(sha256: string, file: string, bytes: number): Promise<void> {
     if (await this.mediaFile(sha256)) return;
-    await fs.mkdir(this.layout.media, { recursive: true });
+    await fs.mkdir(/* turbopackIgnore: true */ this.layout.media, { recursive: true });
     await atomicWriteFile(this.refFile(sha256), JSON.stringify({ v: 1, path: file, bytes }), { fsync: false });
   }
 
@@ -549,7 +549,7 @@ export class RunStore {
   async relocateReferences(fromDir: string, toDir: string, platform: NodeJS.Platform = process.platform): Promise<number> {
     let names: string[];
     try {
-      names = await fs.readdir(this.layout.media);
+      names = await fs.readdir(/* turbopackIgnore: true */ this.layout.media);
     } catch {
       return 0;
     }
@@ -557,10 +557,10 @@ export class RunStore {
     for (const name of names) {
       const sha256 = name.slice(0, -REF_SUFFIX.length);
       if (!name.endsWith(REF_SUFFIX) || !isSha256(sha256)) continue;
-      const file = path.join(this.layout.media, name);
+      const file = path.join(/* turbopackIgnore: true */ this.layout.media, name);
       let ref: { path?: unknown; bytes?: unknown };
       try {
-        ref = JSON.parse(await fs.readFile(file, "utf8")) as { path?: unknown; bytes?: unknown };
+        ref = JSON.parse(await fs.readFile(/* turbopackIgnore: true */ file, "utf8")) as { path?: unknown; bytes?: unknown };
       } catch {
         continue;
       }
@@ -583,11 +583,11 @@ export class RunStore {
   async mediaEntries(): Promise<{ sha256: string; path: string }[]> {
     this.mediaIndex = await this.listMedia();
     this.mediaIndexAt = Date.now();
-    const entries = [...this.mediaIndex.entries()].map(([sha256, name]) => ({ sha256, path: path.join(this.layout.media, name) }));
+    const entries = [...this.mediaIndex.entries()].map(([sha256, name]) => ({ sha256, path: path.join(/* turbopackIgnore: true */ this.layout.media, name) }));
     try {
-      for (const name of await fs.readdir(this.layout.media)) {
+      for (const name of await fs.readdir(/* turbopackIgnore: true */ this.layout.media)) {
         const sha256 = name.slice(0, -REF_SUFFIX.length);
-        if (name.endsWith(REF_SUFFIX) && isSha256(sha256)) entries.push({ sha256, path: path.join(this.layout.media, name) });
+        if (name.endsWith(REF_SUFFIX) && isSha256(sha256)) entries.push({ sha256, path: path.join(/* turbopackIgnore: true */ this.layout.media, name) });
       }
     } catch {
       // No media folder yet.

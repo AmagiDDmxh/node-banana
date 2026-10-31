@@ -721,6 +721,24 @@ async function externalizeNodeMedia(
 // In-flight saves guard to prevent duplicate concurrent uploads of the same media
 const inFlightSaves = new Map<string, Promise<string>>();
 
+async function uploadViaR2(content: string, workflowPath: string, folder: string, objectId: string): Promise<boolean> {
+  const mime = content.match(/^data:([^;,]+)/i)?.[1] || "application/octet-stream";
+  const extension = mime === "video/quicktime" ? "mov" : mime.split("/")[1] || "bin";
+  const presign = await fetch("/api/storage/r2/presign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workflowPath, folder, objectId, extension, contentType: mime }),
+  });
+  if (presign.status === 404) return false;
+  if (!presign.ok) throw new Error(`R2 presign failed (HTTP ${presign.status})`);
+  const target = await presign.json() as { url?: string };
+  if (!target.url) throw new Error("R2 did not return an upload URL");
+  const blob = await fetch(content).then((response) => response.blob());
+  const uploaded = await fetch(target.url, { method: "PUT", headers: { "Content-Type": mime }, body: blob });
+  if (!uploaded.ok) throw new Error(`R2 upload failed (HTTP ${uploaded.status})`);
+  return true;
+}
+
 /**
  * Save an image and return its ID (with deduplication)
  * @param folder - "inputs" for user-uploaded images, "generations" for AI-generated images
@@ -753,6 +771,28 @@ async function saveImageAndGetId(
   const imageId = existingId || contentMediaId("img", computeContentHash(imageData));
 
   const savePromise = (async () => {
+    // Hosted deployments use a presigned R2 upload so image bytes never pass
+    // through the Vercel Function body limit. Local development keeps the
+    // filesystem route below.
+    const mimeMatch = imageData.match(/^data:([^;,]+)/i);
+    const mime = mimeMatch?.[1] || "image/png";
+    const extension = mime === "image/jpeg" ? "jpg" : mime.split("/")[1] || "png";
+    const presign = await fetch("/api/storage/r2/presign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workflowPath, folder, objectId: imageId, extension, contentType: mime }),
+    });
+    if (presign.ok) {
+      const target = await presign.json() as { url?: string };
+      if (!target.url) throw new Error("R2 did not return an upload URL");
+      const blob = await fetch(imageData.startsWith("data:") ? imageData : `data:${mime};base64,${imageData}`).then((response) => response.blob());
+      const uploaded = await fetch(target.url, { method: "PUT", headers: { "Content-Type": mime }, body: blob });
+      if (!uploaded.ok) throw new Error(`R2 upload failed (HTTP ${uploaded.status})`);
+      savedImageIds.set(hash, imageId);
+      return imageId;
+    }
+    if (presign.status !== 404) throw new Error(`R2 presign failed (HTTP ${presign.status})`);
+
     const response = await fetchWithTimeout(
       "/api/workflow-images",
       {
@@ -819,6 +859,10 @@ async function saveVideoAndGetRef(
   const videoId = existingId || generateMediaId("vid");
 
   const savePromise = (async () => {
+    if (await uploadViaR2(videoData, workflowPath, "generations", videoId)) {
+      savedMediaIds.set(hash, videoId);
+      return videoId;
+    }
     const response = await fetchWithTimeout(
       "/api/save-generation",
       {
@@ -887,6 +931,10 @@ async function saveAudioAndGetRef(
   const audioId = existingId || generateMediaId("aud");
 
   const savePromise = (async () => {
+    if (await uploadViaR2(audioData, workflowPath, "generations", audioId)) {
+      savedMediaIds.set(hash, audioId);
+      return audioId;
+    }
     const response = await fetchWithTimeout(
       "/api/save-generation",
       {
@@ -1365,7 +1413,48 @@ async function loadMediaById(
 
   let response: Response;
 
+  if (mediaType !== "image") {
+    const r2 = await fetch(`/api/storage/r2/presign?workflowPath=${encodeURIComponent(workflowPath)}&folder=generations&objectId=${encodeURIComponent(mediaId)}`);
+    if (r2.ok) {
+      const target = await r2.json() as { url?: string };
+      if (target.url) {
+        const media = await fetch(target.url);
+        if (media.ok) {
+          const blob = await media.blob();
+          const data = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result));
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(blob);
+          });
+          loadedMedia.set(mediaId, data);
+          return data;
+        }
+      }
+    }
+  }
+
   if (mediaType === "image") {
+    for (const folder of ["generations", "inputs"]) {
+      const r2 = await fetch(`/api/storage/r2/presign?workflowPath=${encodeURIComponent(workflowPath)}&folder=${folder}&objectId=${encodeURIComponent(mediaId)}`);
+      if (r2.ok) {
+        const target = await r2.json() as { url?: string };
+        if (target.url) {
+          const media = await fetch(target.url);
+          if (media.ok) {
+            const blob = await media.blob();
+            const data = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(String(reader.result));
+              reader.onerror = () => reject(reader.error);
+              reader.readAsDataURL(blob);
+            });
+            loadedMedia.set(mediaId, data);
+            return data;
+          }
+        }
+      }
+    }
     // Use workflow-images API for images (legacy path)
     const params = new URLSearchParams({
       workflowPath,

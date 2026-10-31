@@ -103,11 +103,11 @@ export async function listKnownProjects(input: KnownProjectsInput): Promise<Know
  * such folder.
  */
 export async function generationsStamp(dir: string): Promise<string | null> {
-  const generations = path.join(dir, "generations");
+  const generations = path.join(/* turbopackIgnore: true */ dir, "generations");
   try {
-    const stat = await fs.stat(generations);
+    const stat = await fs.stat(/* turbopackIgnore: true */ generations);
     if (!stat.isDirectory()) return null;
-    const names = await fs.readdir(generations);
+    const names = await fs.readdir(/* turbopackIgnore: true */ generations);
     return `${Math.floor(stat.mtimeMs)}:${names.length}`;
   } catch {
     return null;
@@ -137,13 +137,13 @@ export async function folderBytes(dir: string, budget: SizeBudget = sizeBudget()
     const current = pending.pop()!;
     let entries: Dirent[];
     try {
-      entries = await fs.readdir(current, { withFileTypes: true });
+      entries = await fs.readdir(/* turbopackIgnore: true */ current, { withFileTypes: true });
     } catch {
       continue;
     }
     const files: string[] = [];
     for (const entry of entries) {
-      const full = path.join(current, entry.name);
+      const full = path.join(/* turbopackIgnore: true */ current, entry.name);
       if (entry.isDirectory()) pending.push(full);
       else if (entry.isFile()) files.push(full);
     }
@@ -241,13 +241,13 @@ export function isPersonalFolder(dir: string, home: string = os.homedir(), platf
 export async function holdsOnlyProjectContent(dir: string): Promise<boolean> {
   let entries: Dirent[];
   try {
-    entries = await fs.readdir(dir, { withFileTypes: true });
+    entries = await fs.readdir(/* turbopackIgnore: true */ dir, { withFileTypes: true });
   } catch {
     return false;
   }
   for (const entry of entries) {
     const lower = entry.name.toLowerCase();
-    const full = path.join(dir, entry.name);
+    const full = path.join(/* turbopackIgnore: true */ dir, entry.name);
     if (entry.isDirectory()) {
       if (PROJECT_FOLDERS.has(lower)) continue;
       if (!entry.name.startsWith(".") && (await inspectProject(full, { requireWorkflow: true }))) continue;
@@ -326,13 +326,13 @@ export async function looksLikeProjectsFolder(
   if (projectDirs.some((dir) => pathKey(dir, platform) === pathKey(folder, platform))) return false;
   let entries: Dirent[];
   try {
-    entries = await fs.readdir(folder, { withFileTypes: true });
+    entries = await fs.readdir(/* turbopackIgnore: true */ folder, { withFileTypes: true });
   } catch {
     return false;
   }
   for (const entry of entries) {
     if (entry.name.startsWith(".") || OS_CLUTTER.has(entry.name.toLowerCase())) continue;
-    const full = path.join(folder, entry.name);
+    const full = path.join(/* turbopackIgnore: true */ folder, entry.name);
     if (entry.isDirectory()) {
       if (projectDirs.some((dir) => isInsideRoot(full, dir, { platform, allowEqual: true }))) continue;
       if (RESERVED_FOLDER_NAMES.includes(entry.name.toLowerCase())) continue;
@@ -379,7 +379,7 @@ export function sanitiseFolderName(name: string): string {
 export async function uniqueFolderName(root: string, base: string): Promise<{ folder: string; taken: boolean }> {
   let names: Set<string>;
   try {
-    names = new Set((await fs.readdir(root)).map((name) => name.toLowerCase()));
+    names = new Set((await fs.readdir(/* turbopackIgnore: true */ root)).map((name) => name.toLowerCase()));
   } catch {
     names = new Set();
   }
@@ -394,5 +394,5 @@ export async function uniqueFolderName(root: string, base: string): Promise<{ fo
 /** The folder a new project called `name` is saved in, inside the Node Banana folder. */
 export async function projectFolderName(root: string, name: string): Promise<ProjectFolderName> {
   const { folder, taken } = await uniqueFolderName(root, sanitiseFolderName(name));
-  return { folder, path: path.join(root, folder), taken };
+  return { folder, path: path.join(/* turbopackIgnore: true */ root, folder), taken };
 }

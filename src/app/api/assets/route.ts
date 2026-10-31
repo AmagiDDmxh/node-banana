@@ -15,7 +15,7 @@ import { parseRecordRequest } from "./_lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 600; // a `url` source is downloaded before POST answers
+export const maxDuration = 300; // Vercel Hobby maximum
 
 export async function GET(request: Request) {
   return handle(request, "assets.list", async () => {

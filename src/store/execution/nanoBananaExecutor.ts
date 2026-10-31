@@ -18,7 +18,7 @@ import { calculateGenerationCost } from "@/utils/costCalculator";
 import { buildGenerateHeaders } from "@/store/utils/buildApiHeaders";
 import { GenerationStillRunningError } from "./pollTaskCompletion";
 import { pendingTaskFrom, waitForPendingTask } from "./pendingTask";
-import { runWithFallback } from "./runWithFallback";
+import { runWithFallback, SubmissionUnknownError } from "./runWithFallback";
 import type { GenerationRequest, NodeExecutionContext } from "./types";
 import { MissingInputError } from "./missingInput";
 import {
@@ -146,9 +146,11 @@ export async function executeNanoBanana(
       if (!response.ok) {
         const errorText = await response.text();
         let errorMessage = `HTTP ${response.status}`;
+        let submissionUnknown = false;
         try {
           const errorJson = JSON.parse(errorText);
           errorMessage = errorJson.error || errorMessage;
+          submissionUnknown = errorJson.errorCode === "submission_unknown";
         } catch {
           if (errorText) errorMessage += ` - ${errorText.substring(0, 200)}`;
         }
@@ -157,7 +159,7 @@ export async function executeNanoBanana(
           status: "error",
           error: errorMessage,
         });
-        throw new Error(errorMessage);
+        throw submissionUnknown ? new SubmissionUnknownError(errorMessage) : new Error(errorMessage);
       }
 
       let result = await response.json();
@@ -177,7 +179,7 @@ export async function executeNanoBanana(
 
       finishNanoBanana(ctx, result, requestPayload);
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
+      if (error instanceof SubmissionUnknownError || (error instanceof DOMException && error.name === "AbortError")) {
         throw error;
       }
 
@@ -250,7 +252,7 @@ export function finishNanoBanana(ctx: NodeExecutionContext, result: GenerateResp
   const provider = modelToUse.provider;
   const nodeData = (getFreshNode(node.id)?.data || node.data) as NanoBananaNodeData;
 
-  const image = result.image;
+  const image = result.image || result.imageUrl;
   if (!result.success || !image) {
     updateNodeData(node.id, {
       status: "error",

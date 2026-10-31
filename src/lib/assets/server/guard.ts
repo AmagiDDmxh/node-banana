@@ -37,6 +37,9 @@ export const LIBRARY_UNVOUCHED_MESSAGE =
   "The asset library and file access need Node Banana's own server, which can tell this computer from another: " +
   "start Node Banana with `npm run dev` or `npm start`, not `next dev` or `next start`.";
 
+export const HOSTED_STORAGE_MESSAGE =
+  "The hosted demo does not provide local file storage. Use image generation with inline outputs, or run Node Banana locally for filesystem workflows.";
+
 /** Mirrors sameOrigin.ts: a shorter stamp secret is treated as unset. */
 const MIN_LOCAL_SECRET_LENGTH = 32;
 
@@ -44,6 +47,7 @@ export type AssetRequestCheck = { ok: true } | { ok: false; reason: string };
 
 /** The guard's verdict, with a reason fit to show the user. */
 export function checkAssetRequest(request: Request): AssetRequestCheck {
+  if (process.env.VERCEL) return { ok: false, reason: HOSTED_STORAGE_MESSAGE };
   const allowedHosts = libraryAllowedHosts();
   const result = checkSameOrigin(request, { allowedHosts });
   if (result.ok) return result;
@@ -59,6 +63,15 @@ export function checkAssetRequest(request: Request): AssetRequestCheck {
 
 /** Null when the request may proceed; otherwise the 403 to return. */
 export function guardAssetRequest(request: Request): Response | null {
+  if (process.env.VERCEL) {
+    return NextResponse.json(
+      {
+        error: HOSTED_STORAGE_MESSAGE,
+        code: "local_storage_unavailable",
+      },
+      { status: 501, headers: { "Cache-Control": "no-store" } },
+    );
+  }
   const check = checkAssetRequest(request);
   if (check.ok) return null;
   return NextResponse.json(

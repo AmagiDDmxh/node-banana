@@ -48,9 +48,16 @@ export function providerKeysFromHeaders(headers: Headers): ProviderKeys {
     [keyof typeof KEY_SOURCES, (typeof KEY_SOURCES)[keyof typeof KEY_SOURCES]]
   >) {
     const fromHeader = source.headers.map((name) => headers.get(name)).find(Boolean);
-    const value = fromHeader || process.env[source.env];
+    const value = fromHeader || process.env[source.env] || (
+      provider === "openai" && process.env.NARRA_GATEWAY_BASE_URL
+        ? process.env.NARRA_GATEWAY_API_KEY
+        : undefined
+    );
     if (value) keys[provider] = value;
   }
+
+  // A server-configured Engine provides image models without a client provider key.
+  if (process.env.HYPERPLANE_URL) keys.openai ||= "hyperplane-managed";
 
   const comfy = resolveComfyRouterKey(headers.get(COMFY_ROUTER_HEADER));
   if (comfy) keys.comfy = comfy;

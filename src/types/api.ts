@@ -42,6 +42,7 @@ export interface GenerateResponse {
   errorCode?: string;
   retryAfter?: string;
   image?: string;
+  imageUrl?: string; // For hosted outputs stored in R2
   video?: string;
   videoUrl?: string; // For large videos, return URL directly
   audio?: string; // Base64 audio data

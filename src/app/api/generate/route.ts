@@ -30,9 +30,11 @@ import { submitKieTask } from "./providers/kie";
 import { COMFY_ROUTER_HEADER, comfyRunsSynchronously, resolveComfyRouterKey, runComfySynchronously, submitComfyTask } from "./providers/comfy";
 import { generateWithWaveSpeed } from "./providers/wavespeed";
 import { generateWithOpenAI } from "./providers/openai";
+import { generateWithHyperplane } from "./providers/hyperplane";
 import { buildMediaResponse } from "./shared";
 
-export const maxDuration = 600; // 10 minute timeout for video generation polling
+// Vercel Hobby allows at most 300 seconds; long work should be polled or run by Hyperplane.
+export const maxDuration = 300;
 export const dynamic = 'force-dynamic'; // Ensure this route is always dynamic
 
 
@@ -44,6 +46,24 @@ interface MultiProviderGenerateRequest extends GenerateRequest {
   parameters?: Record<string, unknown>;
   /** Dynamic inputs from schema-based connections (e.g., image_url, tail_image_url, prompt) */
   dynamicInputs?: Record<string, string | string[]>;
+}
+
+async function materializeHostedReference(value: string, request: Request): Promise<string> {
+  let reference: URL;
+  try {
+    reference = new URL(value, request.url);
+  } catch {
+    return value;
+  }
+  // Only fetch same-origin public samples. Other absolute URLs remain subject
+  // to the provider's normal reference validation and are never SSRF-fetched.
+  const requestOrigin = new URL(request.url).origin;
+  if (reference.origin !== requestOrigin || !reference.pathname.startsWith("/sample-images/")) return value;
+  const response = await fetch(reference, { redirect: "error" });
+  if (!response.ok) throw new Error(`Could not load template reference (HTTP ${response.status})`);
+  const mime = response.headers.get("content-type")?.split(";", 1)[0] || "image/png";
+  const bytes = Buffer.from(await response.arrayBuffer());
+  return `data:${mime};base64,${bytes.toString("base64")}`;
 }
 
 
@@ -190,7 +210,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return buildMediaResponse(output);
+      return await buildMediaResponse(output);
     }
 
     if (provider === "fal") {
@@ -265,7 +285,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return buildMediaResponse(output);
+      return await buildMediaResponse(output);
     }
 
     if (provider === "kie") {
@@ -412,7 +432,7 @@ export async function POST(request: NextRequest) {
         if (!output?.data && !output?.url) {
           return NextResponse.json<GenerateResponse>({ success: false, error: "No output in generation result" }, { status: 500 });
         }
-        return buildMediaResponse(output);
+        return await buildMediaResponse(output);
       }
 
       // Submit task and return immediately — client polls for completion
@@ -458,8 +478,12 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Keep Data URIs as-is since localhost URLs won't work
-      const processedImages: string[] = images ? [...images] : [];
+      // OpenAI references must be bytes. Hosted preset templates use public
+      // same-origin sample URLs to keep the quickstart response small; resolve
+      // those URLs here immediately before the provider request.
+      const processedImages: string[] = images
+        ? await Promise.all(images.map((image) => materializeHostedReference(image, request)))
+        : [];
 
       // Process dynamicInputs: filter empty values
       let processedDynamicInputs: Record<string, string | string[]> | undefined = undefined;
@@ -514,7 +538,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return buildMediaResponse(output);
+      return await buildMediaResponse(output);
     }
 
     if (provider === "openai") {
@@ -526,8 +550,9 @@ export async function POST(request: NextRequest) {
       }
 
       // User-provided key takes precedence over env variable
-      const openaiApiKey = request.headers.get("X-OpenAI-API-Key") || process.env.OPENAI_API_KEY;
-      if (!openaiApiKey) {
+      const openaiApiKey = request.headers.get("X-OpenAI-API-Key") ||
+        (process.env.NARRA_GATEWAY_BASE_URL ? process.env.NARRA_GATEWAY_API_KEY : process.env.OPENAI_API_KEY);
+      if (!openaiApiKey && !process.env.HYPERPLANE_URL) {
         return NextResponse.json<GenerateResponse>(
           {
             success: false,
@@ -537,8 +562,11 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Keep Data URIs as-is since localhost URLs won't work
-      const processedImages: string[] = images ? [...images] : [];
+      // OpenAI references must be bytes. Hosted preset templates use public
+      // same-origin sample URLs to keep the quickstart response small.
+      const processedImages: string[] = images
+        ? await Promise.all(images.map((image) => materializeHostedReference(image, request)))
+        : [];
 
       // Process dynamicInputs: filter empty values
       let processedDynamicInputs: Record<string, string | string[]> | undefined = undefined;
@@ -553,7 +581,13 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
-          processedDynamicInputs[key] = value;
+          if (key === "image") {
+            processedDynamicInputs[key] = Array.isArray(value)
+              ? await Promise.all(value.map((image) => materializeHostedReference(image, request)))
+              : await materializeHostedReference(value, request);
+          } else {
+            processedDynamicInputs[key] = value;
+          }
         }
       }
 
@@ -573,7 +607,9 @@ export async function POST(request: NextRequest) {
         signal: request.signal,
       };
 
-      const result = await generateWithOpenAI(requestId, openaiApiKey, genInput);
+      const result = process.env.HYPERPLANE_URL
+        ? await generateWithHyperplane(requestId, genInput)
+        : await generateWithOpenAI(requestId, openaiApiKey!, genInput);
 
       if (!result.success) {
         return NextResponse.json<GenerateResponse>(
@@ -599,7 +635,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return buildMediaResponse(output, result.generation);
+      return await buildMediaResponse(output, result.generation);
     }
 
     // Default: Use Gemini
@@ -647,7 +683,7 @@ export async function POST(request: NextRequest) {
           { status: result.statusCode ?? 500 },
         );
       }
-      return buildMediaResponse(output);
+      return await buildMediaResponse(output);
     }
 
     // Check if this is a Veo video model request
@@ -684,7 +720,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return buildMediaResponse(output);
+      return await buildMediaResponse(output);
     }
 
     return await generateWithGemini(
